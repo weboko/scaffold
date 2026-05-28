@@ -1,4 +1,4 @@
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::process::Command;
 
 use anyhow::{bail, Context};
@@ -177,20 +177,9 @@ fn build_hook_command(
 ) -> Command {
     let port = project.config.localnet.port;
     let sequencer_url = format!("http://127.0.0.1:{port}");
-    let wallet_home = project
-        .root
-        .join(&project.config.wallet_home_dir)
-        .canonicalize()
-        .unwrap_or_else(|_| project.root.join(&project.config.wallet_home_dir));
-    let project_root = project
-        .root
-        .canonicalize()
-        .unwrap_or_else(|_| project.root.clone());
-    let idl_dir = project
-        .root
-        .join(&project.config.framework.idl.path)
-        .canonicalize()
-        .unwrap_or_else(|_| project.root.join(&project.config.framework.idl.path));
+    let wallet_home = canonical_or_self(&project.root.join(&project.config.wallet_home_dir));
+    let project_root = canonical_or_self(&project.root);
+    let idl_dir = canonical_or_self(&project.root.join(&project.config.framework.idl.path));
 
     let mut cmd = Command::new("sh");
     cmd.arg("-c")
@@ -212,6 +201,14 @@ fn build_hook_command(
         cmd.env("SCAFFOLD_GUEST_BIN", &sp.binary_path);
     }
     cmd
+}
+
+/// Resolve a path to its canonical form, falling back to the path as-is when
+/// canonicalization fails (e.g. the directory does not exist yet). Hook env
+/// vars prefer the symlink-resolved absolute path but must never fail the run
+/// just because a directory is missing.
+fn canonical_or_self(path: &Path) -> PathBuf {
+    path.canonicalize().unwrap_or_else(|_| path.to_path_buf())
 }
 
 fn single_program_binary(project: &Project) -> DynResult<Option<PathBuf>> {
