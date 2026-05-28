@@ -454,16 +454,8 @@ pub(crate) fn run(args: Vec<String>) -> DynResult<()> {
         }),
         Some(Commands::Setup(_)) => cmd_setup(),
         Some(Commands::Build(args)) => match args.subcommand {
-            Some(BuildSubcommand::Idl(sub)) => cmd_idl(
-                &sub.project_path
-                    .map(|p| vec!["build".to_string(), p.to_string_lossy().to_string()])
-                    .unwrap_or_else(|| vec!["build".to_string()]),
-            ),
-            Some(BuildSubcommand::Client(sub)) => cmd_client(
-                &sub.project_path
-                    .map(|p| vec!["build".to_string(), p.to_string_lossy().to_string()])
-                    .unwrap_or_else(|| vec!["build".to_string()]),
-            ),
+            Some(BuildSubcommand::Idl(sub)) => cmd_idl(sub.project_path),
+            Some(BuildSubcommand::Client(sub)) => cmd_client(sub.project_path),
             None => cmd_build_shortcut(args.project_path),
         },
         Some(Commands::Deploy(args)) => cmd_deploy(args.program_name, args.program_path, args.json),

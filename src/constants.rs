@@ -105,12 +105,13 @@ pub(crate) const LGPM_ATTR: &str = "cli";
 /// shipped as portable-only, so dev basecamp can't load them). When
 /// `basecamp modules` auto-discovery walks a project's `metadata.json` and
 /// finds a dep in this table, it captures the pinned flake ref into
-/// `[basecamp.modules]` so `install` builds and installs the dev variant.
+/// `[modules.<name>]` (with `role = "dependency"`) so `install` builds and
+/// installs the dev variant.
 ///
 /// Keyed by the module name as it appears in `metadata.json` `dependencies`.
 /// Paired conceptually with `DEFAULT_BASECAMP_PIN` — when basecamp bumps, revisit
-/// these pins to stay ABI-compatible. Per-project overrides go in
-/// `[basecamp.dependencies]` in `scaffold.toml`.
+/// these pins to stay ABI-compatible. Per-project overrides are explicit
+/// `[modules.<name>]` entries with `role = "dependency"` in `scaffold.toml`.
 ///
 /// See the upstream issue tracking a proper `logos-modules` release pin:
 /// <https://github.com/logos-co/logos-basecamp/issues/167>. Once that lands
@@ -124,10 +125,10 @@ pub(crate) const BASECAMP_DEPENDENCIES: &[(&str, &str)] = &[
     // Pin to the head of `tutorial-v1-compat` on logos-delivery-module
     // (commit `1fde1566…`, 2026-04-22) — the rev that both `tictactoe` and
     // `yolo-board-module` use in their own flakes. This is the known-good
-    // default; per-project overrides in `[basecamp.dependencies]` in
-    // `scaffold.toml` take precedence, and `basecamp modules` auto-discovery
-    // prefers any matching input found in the project's own `flake.lock`
-    // over this table (so a project's own pin always wins).
+    // default; per-project `[modules.<name>]` entries in `scaffold.toml` take
+    // precedence, and `basecamp modules` auto-discovery prefers any matching
+    // input found in the project's own `flake.lock` over this table (so a
+    // project's own pin always wins).
     (
         "delivery_module",
         "github:logos-co/logos-delivery-module/1fde1566291fe062b98255003b9166b0261c6081#lgx",

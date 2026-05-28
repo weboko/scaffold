@@ -2075,9 +2075,8 @@ fn cmd_basecamp_doctor(project: Project, as_json: bool) -> DynResult<()> {
     use crate::commands::doctor::{finalize_report, print_report};
     use crate::model::CheckStatus;
 
-    if as_json {
-        crate::process::set_command_echo(false);
-    }
+    // Suppress command echo in JSON mode so stdout stays a clean JSON stream.
+    let _echo_guard = as_json.then(crate::process::EchoGuard::suppress);
 
     let mut rows = Vec::new();
     push_basecamp_doctor_rows(&project, &mut rows);
@@ -2096,7 +2095,6 @@ fn cmd_basecamp_doctor(project: Project, as_json: bool) -> DynResult<()> {
     let report = finalize_report(rows);
 
     if as_json {
-        crate::process::set_command_echo(true);
         println!("{}", serde_json::to_string_pretty(&report)?);
     } else {
         print_report(&report);

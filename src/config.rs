@@ -334,7 +334,9 @@ fn parse_localnet(doc: &DocumentMut) -> DynResult<LocalnetConfig> {
         })?;
     }
     if let Some(v) = table.get("risc0_dev_mode").and_then(Item::as_value) {
-        cfg.risc0_dev_mode = v.as_bool().unwrap_or(true);
+        cfg.risc0_dev_mode = v.as_bool().ok_or_else(|| {
+            anyhow!("invalid scaffold.toml: [localnet].risc0_dev_mode must be a boolean")
+        })?;
     }
     Ok(cfg)
 }
@@ -381,12 +383,9 @@ pub(crate) fn serialize_config(cfg: &Config) -> DynResult<String> {
             ModuleRole::Project => "project",
             ModuleRole::Dependency => "dependency",
         };
-        let path = format!("modules.{name}");
         let table = ensure_subtable(&mut doc, "modules", name);
         table["flake"] = value(&entry.flake);
         table["role"] = value(role_str);
-        // Defensive: the function's check above already covered both fields.
-        let _ = path;
     }
 
     // [wallet]
@@ -787,6 +786,16 @@ role = "project"
             err.to_string().contains("70000") || err.to_string().contains("u16"),
             "{err}"
         );
+    }
+
+    #[test]
+    fn parse_localnet_risc0_dev_mode_non_bool_errors() {
+        // A non-bool value must fail loudly rather than silently coercing to
+        // `true` (which would flip dev-mode on for a config that wrote a string
+        // or integer by mistake).
+        let toml = minimal_v0_2_0().replace("risc0_dev_mode = true", "risc0_dev_mode = \"yes\"");
+        let err = parse_config(&toml).unwrap_err();
+        assert!(err.to_string().contains("risc0_dev_mode"), "{err}");
     }
 
     #[test]

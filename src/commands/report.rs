@@ -17,7 +17,7 @@ use super::localnet::build_localnet_status_for_project;
 use crate::model::{
     CollectedItem, RedactionSummary, ReportManifest, SkippedItem, ToolCommandResult,
 };
-use crate::process::{set_command_echo, which};
+use crate::process::{which, EchoGuard};
 use crate::project::{load_project, resolve_repo_path};
 use crate::state::write_text;
 use crate::DynResult;
@@ -170,9 +170,12 @@ fn collect_report_artifacts(
         notes: Some("bundle safety warning".to_string()),
     });
 
-    set_command_echo(false);
-    let doctor_result = build_doctor_report();
-    set_command_echo(true);
+    let doctor_result = {
+        // Suppress command echo only while the nested doctor run executes;
+        // the guard restores it on scope exit even if collection later fails.
+        let _echo_guard = EchoGuard::suppress();
+        build_doctor_report()
+    };
     match doctor_result {
         Ok(report) => {
             collect_sanitized_json_artifact(

@@ -13,16 +13,12 @@ use crate::DynResult;
 
 static ECHO_COMMANDS: AtomicBool = AtomicBool::new(true);
 
-pub(crate) fn set_command_echo(enabled: bool) {
-    ECHO_COMMANDS.store(enabled, Ordering::Relaxed);
-}
-
 /// RAII guard that suppresses subprocess command echo for the duration of its
 /// scope. On drop, restores `ECHO_COMMANDS` to whatever it was when the guard
 /// was constructed — so nesting (or already-suppressed outer scopes) round-trip
-/// correctly. Use this instead of paired `set_command_echo(false)` /
-/// `set_command_echo(true)` calls so a `?` propagation or panic doesn't leave
-/// echo permanently disabled for the rest of the process.
+/// correctly. Use this instead of paired manual echo toggles so a `?`
+/// propagation or panic doesn't leave echo permanently disabled for the rest
+/// of the process.
 pub(crate) struct EchoGuard {
     restore_to: bool,
 }

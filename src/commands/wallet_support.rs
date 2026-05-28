@@ -39,7 +39,7 @@ pub(crate) fn load_wallet_runtime(project: &Project) -> DynResult<WalletRuntimeC
         );
     }
 
-    let (_, wallet_config) = read_wallet_config(&wallet_home)?;
+    let wallet_config = read_wallet_config(&wallet_home)?;
     let sequencer_addr = wallet_config
         .get("sequencer_addr")
         .and_then(Value::as_str)
@@ -52,7 +52,7 @@ pub(crate) fn load_wallet_runtime(project: &Project) -> DynResult<WalletRuntimeC
     })
 }
 
-fn read_wallet_config(wallet_home: &Path) -> DynResult<(PathBuf, Value)> {
+fn read_wallet_config(wallet_home: &Path) -> DynResult<Value> {
     let primary = wallet_home.join(WALLET_CONFIG_PRIMARY);
     let fallback = wallet_home.join(WALLET_CONFIG_FALLBACK);
 
@@ -79,11 +79,11 @@ fn read_wallet_config(wallet_home: &Path) -> DynResult<(PathBuf, Value)> {
     let value = serde_json::from_str::<Value>(&text)
         .with_context(|| format!("failed to parse wallet config JSON at {}", path.display()))?;
 
-    Ok((path, value))
+    Ok(value)
 }
 
 pub(crate) fn first_public_wallet_address(wallet_home: &Path) -> DynResult<Option<String>> {
-    let (_, wallet_config) = read_wallet_config(wallet_home)?;
+    let wallet_config = read_wallet_config(wallet_home)?;
     let Some(accounts) = wallet_config
         .get("initial_accounts")
         .and_then(Value::as_array)
@@ -466,7 +466,7 @@ fn one_line(text: &str) -> String {
 
 #[cfg(test)]
 mod tests {
-    use super::{WALLET_CONFIG_FALLBACK, WALLET_CONFIG_PRIMARY};
+    use super::WALLET_CONFIG_PRIMARY;
     use std::fs;
 
     use tempfile::tempdir;

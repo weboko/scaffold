@@ -2,7 +2,7 @@ use std::fs;
 use std::path::PathBuf;
 use std::process::Command;
 
-use anyhow::{anyhow, bail};
+use anyhow::bail;
 
 use crate::constants::FRAMEWORK_KIND_LEZ_FRAMEWORK;
 use crate::process::run_capture;
@@ -14,18 +14,8 @@ const IDL_BEGIN_PREFIX: &str = "--- LSSA IDL BEGIN ";
 const IDL_END_PREFIX: &str = "--- LSSA IDL END ";
 const IDL_MARKER_SUFFIX: &str = " ---";
 
-pub(crate) fn cmd_idl(args: &[String]) -> DynResult<()> {
-    if args.is_empty() {
-        bail!("usage: logos-scaffold build idl [project-path]");
-    }
-
-    match args[0].as_str() {
-        "build" => {
-            let project_dir = parse_optional_project_path(&args[1..], "logos-scaffold build idl")?;
-            run_in_project_dir(project_dir.as_deref(), build_idl_for_current_project)
-        }
-        other => Err(anyhow!("unknown idl command: {other}")),
-    }
+pub(crate) fn cmd_idl(project_path: Option<PathBuf>) -> DynResult<()> {
+    run_in_project_dir(project_path.as_deref(), build_idl_for_current_project)
 }
 
 pub(crate) fn build_idl_for_current_project() -> DynResult<()> {
@@ -69,23 +59,6 @@ pub(crate) fn build_idl_for_current_project() -> DynResult<()> {
     }
 
     Ok(())
-}
-
-fn parse_optional_project_path(args: &[String], usage_label: &str) -> DynResult<Option<PathBuf>> {
-    let mut project_dir: Option<PathBuf> = None;
-
-    for arg in args {
-        if arg.starts_with("--") {
-            bail!("unknown flag for `{usage_label}`: {arg}");
-        }
-        if project_dir.is_none() {
-            project_dir = Some(PathBuf::from(arg));
-        } else {
-            bail!("unexpected argument `{arg}` for `{usage_label}`");
-        }
-    }
-
-    Ok(project_dir)
 }
 
 fn clear_existing_json_files(dir: &std::path::Path) -> DynResult<()> {

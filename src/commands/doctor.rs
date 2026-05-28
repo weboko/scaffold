@@ -13,7 +13,7 @@ use crate::doctor_checks::{
     check_standalone_support, one_line, print_rows,
 };
 use crate::model::{CheckRow, CheckStatus, DoctorReport, DoctorSummary};
-use crate::process::{pid_running, run_capture, run_with_stdin, set_command_echo};
+use crate::process::{pid_running, run_capture, run_with_stdin, EchoGuard};
 use crate::project::{load_project, resolve_cache_root, resolve_repo_path};
 use crate::state::read_localnet_state;
 use crate::DynResult;
@@ -24,17 +24,9 @@ const STEP_EXPORT_WALLET_HOME: &str = "export NSSA_WALLET_HOME_DIR=$(pwd)/.scaff
 const STEP_DOCTOR: &str = "logos-scaffold doctor";
 
 pub(crate) fn cmd_doctor(as_json: bool) -> DynResult<()> {
-    if as_json {
-        set_command_echo(false);
-    }
-
-    let result = cmd_doctor_inner(as_json);
-
-    if as_json {
-        set_command_echo(true);
-    }
-
-    result
+    // Suppress command echo in JSON mode so stdout stays a clean JSON stream.
+    let _echo_guard = as_json.then(EchoGuard::suppress);
+    cmd_doctor_inner(as_json)
 }
 
 fn cmd_doctor_inner(as_json: bool) -> DynResult<()> {
