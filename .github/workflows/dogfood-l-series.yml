@@ -1,0 +1,78 @@
+name: Dogfood L-series (temporary)
+# Temporary: runs DOGFOODING.md L1-L4 verbatim on a Docker-capable host.
+on:
+  push:
+    branches: [dogfood/l-series-ci]
+  workflow_dispatch:
+jobs:
+  l-series:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    env:
+      LGS: ${{ github.workspace }}/target/release/logos-scaffold
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Reclaim disk
+        run: sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /usr/local/share/boost || true
+      - name: System deps
+        run: sudo apt-get update && sudo apt-get install -y pkgconf libpcsclite-dev
+      - name: Probe Logos nix cache reachability (B-series side question)
+        run: curl -sS -o /dev/null -w 'cache.nix.logos.co -> %{http_code}\n' --max-time 15 https://cache.nix.logos.co/public/nix-cache-info || true
+      - name: Risc Zero toolchain
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          curl -fsSL https://risczero.com/install | bash
+          echo "$HOME/.risc0/bin" >> "$GITHUB_PATH"
+          for i in 1 2 3; do "$HOME/.risc0/bin/rzup" install rust && "$HOME/.risc0/bin/rzup" install cpp && "$HOME/.risc0/bin/rzup" install cargo-risczero 3.0.5 && break; sleep 30; done
+          PATH="$HOME/.risc0/bin:$PATH" cargo risczero --version
+      - name: Build scaffold
+        run: cargo build --release --bin logos-scaffold
+      - name: L1 new --template spel
+        run: |
+          set -euxo pipefail
+          cd "$RUNNER_TEMP"
+          $LGS new dogfood-spel --template spel
+          cd dogfood-spel
+          ls -d spel.toml Makefile dogfood_spel_core dogfood_spel_ffi methods/guest/src/bin
+          grep -n spel-framework methods/guest/Cargo.toml
+      - name: L1 setup
+        run: cd "$RUNNER_TEMP/dogfood-spel" && $LGS setup
+      - name: L1 localnet start + doctor
+        run: |
+          set -euxo pipefail
+          cd "$RUNNER_TEMP/dogfood-spel"
+          $LGS localnet start
+          $LGS doctor
+      - name: L1 build (Docker guest build + IDL)
+        run: |
+          set -euxo pipefail
+          cd "$RUNNER_TEMP/dogfood-spel"
+          $LGS build
+          ls -l ./*-idl.json methods/guest/target/riscv32im-risc0-zkvm-elf/docker/
+      - name: L2 build idl
+        run: cd "$RUNNER_TEMP/dogfood-spel" && $LGS build idl && ls -l ./*-idl.json
+      - name: L3 build client
+        run: cd "$RUNNER_TEMP/dogfood-spel" && $LGS build client && find ./*_ffi/generated -type f | sort
+      - name: L4 deploy and interact
+        run: |
+          set -euxo pipefail
+          cd "$RUNNER_TEMP/dogfood-spel"
+          $LGS wallet -- check-health
+          $LGS deploy | tee /tmp/deploy.log
+          sleep 20
+          ID=$($LGS wallet -- account new public | grep -o 'Public/[1-9A-HJ-NP-Za-km-z]*' | head -1)
+          echo "signer=$ID"
+          $LGS wallet -- auth-transfer init --account-id "$ID"
+          sleep 20
+          $LGS spel -- initialize --owner "$ID" | tee /tmp/init.log
+          $LGS spel -- pda state | tee /tmp/pda.log
+          PDA=$(grep -oE '[1-9A-HJ-NP-Za-km-z]{43,44}' /tmp/pda.log | tail -1)
+          echo "pda=$PDA"
+          sleep 20
+          $LGS spel -- inspect "$PDA" --type ProgramState | tee /tmp/inspect.log
+      - name: Sequencer log tail
+        if: always()
+        run: tail -n 80 "$RUNNER_TEMP/dogfood-spel/.scaffold/logs/sequencer.log" || true
