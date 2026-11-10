@@ -1,0 +1,35 @@
+name: Dogfood B-series (temporary)
+# Temporary: runs DOGFOODING.md B1-B6 on a runner with enough RAM to evaluate
+# the basecamp 0.3.0 flake. Not for merge.
+on:
+  push:
+    branches: [dogfood/b-series-ci]
+  workflow_dispatch:
+jobs:
+  b-series:
+    runs-on: ubuntu-latest
+    timeout-minutes: 350
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Reclaim disk
+        run: sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /usr/local/share/boost /opt/hostedtoolcache/CodeQL || true; df -h /
+      - name: System deps
+        run: sudo apt-get update && sudo apt-get install -y pkgconf libpcsclite-dev xvfb xdotool imagemagick x11-utils time
+      - uses: cachix/install-nix-action@v31
+        with:
+          extra_nix_config: |
+            experimental-features = nix-command flakes
+            access-tokens = github.com=${{ secrets.GITHUB_TOKEN }}
+      - name: Build scaffold
+        run: cargo build --release --bin logos-scaffold
+      - name: B-series
+        run: bash .github/dogfood-b-series.sh 2>&1 | tee "$RUNNER_TEMP/b-series.log"
+      - name: Upload evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: b-series-evidence
+          path: |
+            ${{ runner.temp }}/b-series.log
+            ${{ runner.temp }}/b-out
